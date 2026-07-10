@@ -68,7 +68,7 @@ if "sandbox_graph" not in st.session_state:
     for _ in range(300):
         u, v = random.choice(list(G.nodes)), random.choice(list(G.nodes))
         if u != v:
-            G.add_edge(u, v, amount=random.exponential(1500), timestamp=random.randint(0, 86400), is_fraud=0)
+            G.add_edge(u, v, amount=float(np.random.exponential(1500)), timestamp=random.randint(0, 86400), is_fraud=0)
             
     # Inject cycles (Laundering Ring A)
     cycle_nodes = ["ACC_CYCLE_A", "ACC_CYCLE_B", "ACC_CYCLE_C", "ACC_CYCLE_D"]
