@@ -8,13 +8,27 @@
 
 > A transaction monitoring and Anti-Money Laundering (AML) system. SentinelGraph combines a classical gradient-boosted tabular baseline (XGBoost) with a **GraphSAGE Graph Neural Network (GNN) trained on the transaction network**, catching coordinated laundering rings, circular splits, and structuring patterns that bypass traditional row-level scanners.
 
+[![Live Demo](https://img.shields.io/badge/Live-Demo-blue?style=for-the-badge&logo=streamlit)](https://sentinelgraph.streamlit.app/)
+
+![Demo](demo.gif)
+
 ---
 
 ## 🏛️ System Architecture
 
 SentinelGraph uses a streaming-first architecture where transactions are pushed through an asynchronous processing queue, updating a dynamic NetworkX graph while dual classifiers score the activity in parallel.
 
-![SentinelGraph Architecture](sentinalGraph.png)
+```mermaid
+graph TD
+    A[Raw Transactions] -->|Streaming / Simulator| B(Async Message Queue)
+    B --> C[Feature Engineering]
+    C -->|Tabular Features| D(XGBoost Baseline)
+    C -->|Network Construction| E(PyG GraphSAGE)
+    D --> F{Score Fusion Aggregator}
+    E --> F
+    F -->|Risk Score + SHAP| G[FastAPI Service]
+    G --> H[Streamlit UI Command Center]
+```
 
 ### Key Features
 
@@ -42,7 +56,7 @@ Unlike GCNs, GraphSAGE relies on **neighborhood sampling** to generate represent
 ### 1. Clone & Set Up Virtual Environment
 ```bash
 git clone https://github.com/prem151105/SentinelGraph.git
-cd fraudgraph-aml-detection
+cd SentinelGraph
 
 # Create and activate environment
 python -m venv .venv
@@ -53,6 +67,13 @@ source .venv/bin/activate
 ```
 
 ### 2. Install Dependencies
+
+For local model training, data generation, and full backend:
+```bash
+pip install -r requirements-train.txt
+```
+
+For running the dashboard only (Streamlit Cloud mode):
 ```bash
 pip install -r requirements.txt
 ```

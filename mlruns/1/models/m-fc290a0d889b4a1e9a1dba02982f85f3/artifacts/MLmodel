@@ -1,0 +1,22 @@
+artifact_path: file:D:/PROJECTS/fraudgraph-aml-detection/mlruns/1/models/m-fc290a0d889b4a1e9a1dba02982f85f3/artifacts
+flavors:
+  python_function:
+    data: model.ubj
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.xgboost
+    python_version: 3.13.14
+  xgboost:
+    code: null
+    data: model.ubj
+    model_class: xgboost.sklearn.XGBClassifier
+    model_format: ubj
+    xgb_version: 3.3.0
+mlflow_version: 3.14.0
+model_id: m-fc290a0d889b4a1e9a1dba02982f85f3
+model_size_bytes: 2094569
+model_uuid: m-fc290a0d889b4a1e9a1dba02982f85f3
+prompts: null
+run_id: 0182e8f8b18b4849a182059734d7f4fa
+utc_time_created: '2026-07-10 05:48:54.169139'

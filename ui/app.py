@@ -35,28 +35,28 @@ api_active = check_api_server()
 # ── Custom Dark Styling (AML Command Center Theme) ────────────────────────────
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Outfit:wght@300;400;600;700&display=swap');
 
 html, body, [class*="css"] {
     font-family: 'Outfit', sans-serif;
-    background-color: #0b0f19;
-    color: #f8fafc;
+    background-color: #14161C;
+    color: #E7E9EE;
 }
-.jetbrains-font {
-    font-family: 'JetBrains Mono', monospace;
-}
+h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; }
+.jetbrains-font { font-family: 'JetBrains Mono', monospace; }
 .metric-card {
-    background: linear-gradient(135deg, #0f172a, #1e293b);
-    border: 1px solid #334155;
+    background: #1D2029;
+    border: 1px solid #5B6478;
     border-radius: 12px;
     padding: 1.2rem;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
     text-align: center;
 }
-.neon-green { color: #10b981; text-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
-.neon-red { color: #ef4444; text-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
-.neon-yellow { color: #f59e0b; text-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
-.stProgress > div > div { background: linear-gradient(90deg, #3b82f6, #ef4444); }
+.neon-green { color: #3E7C8C; }
+.neon-red { color: #E5484D; }
+.neon-yellow { color: #E5484D; }
+.stProgress > div > div { background: linear-gradient(90deg, #3E7C8C, #E5484D); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -146,9 +146,9 @@ with st.sidebar:
     if api_active:
         st.success("🟢 Local API Connected (Port 8001)")
     else:
-        st.info("☁️ Sandbox Simulation Mode")
+        st.info("☁️ Running on simulated transaction data — no live feed connected")
 
-# ── MAIN PANEL: ONE PAGE LAYOUT ───────────────────────────────────────────────
+# ── MAIN PANEL ───────────────────────────────────────────────────────────────
 st.title("🛡️ SentinelGraph — Graph-Augmented AML Monitoring")
 st.write(
     "SentinelGraph combines a gradient-boosted tabular baseline (XGBoost) with a "
@@ -158,339 +158,351 @@ st.write(
 
 st.divider()
 
-# 1. System Architecture
-st.subheader("🕸️ System Architecture & Data Ingestion Flow")
-if os.path.exists("sentinalGraph.png"):
-    st.image("sentinalGraph.png", caption="SentinelGraph Operations Flow Chart", use_container_width=True)
-else:
-    st.info("System architecture diagram (sentinalGraph.png) not found.")
+tab_cmd, tab_exp, tab_arch = st.tabs(["Command Center", "GraphSAGE Explainer", "Architecture"])
 
-st.divider()
+with tab_arch:
+    st.subheader("🕸️ System Architecture & Data Ingestion Flow")
+    st.components.v1.html("""
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'dark', themeVariables: { fontFamily: 'Outfit' } });
+    </script>
+    <div class="mermaid">
+    graph TD
+        A[Raw Transactions] -->|Streaming / Simulator| B(Async Message Queue)
+        B --> C[Feature Engineering]
+        C -->|Tabular Features| D(XGBoost Baseline)
+        C -->|Network Construction| E(PyG GraphSAGE)
+        D --> F{Score Fusion Aggregator}
+        E --> F
+        F -->|Risk Score + SHAP| G[FastAPI Service]
+        G --> H[Streamlit UI Command Center]
+    </div>
+    """, height=450)
 
-# 2. GraphSAGE Theory & Neighborhood Aggregator Explainer
-st.subheader("🧠 GraphSAGE Neighborhood Sampling Explainer")
-st.write(
-    "How does a GNN capture connections? Traditional models only check row-level metrics. "
-    "GraphSAGE aggregates features from the target node's local neighborhood (1-hop and 2-hop paths) "
-    "to build a dense vector embedding that reflects its structural position."
-)
-
-target_node = st.selectbox("Pick Target Node to visualize GNN aggregation", ["ACC_CYCLE_A (Cycle Hub)", "ACC_SPLIT_SRC (Splitter Node)", "ACC_005 (Regular Node)"])
-hops = st.slider("Neighborhood depth (Hops)", 1, 2, 2)
-
-col_ta, col_tb = st.columns([1, 1.5])
-with col_ta:
-    st.write("### Aggregator Summary")
-    if "CYCLE" in target_node:
-        st.markdown("**Target Node:** ACC_CYCLE_A (Factual: 🔴 Fraud Loop)")
-        st.markdown("**1-Hop Neighbors:** ACC_CYCLE_B (Outflow), ACC_CYCLE_D (Inflow)")
-        if hops == 2:
-            st.markdown("**2-Hop Neighbors:** ACC_CYCLE_C (Loop connector)")
-            st.markdown("**Aggregator Formula:**")
-            st.latex(r"h_{v}^{(1)} = \text{ReLU}\left(W \cdot \text{Mean}(\{h_{u}^{(0)}, \forall u \in \mathcal{N}(v)\})\right)")
-            st.warning("⚠️ GNN detects identical, circular transaction flows with neighbor nodes. Fused risk is highly elevated.")
-    elif "SPLIT" in target_node:
-        st.markdown("**Target Node:** ACC_SPLIT_SRC (Factual: 🔴 Splitter)")
-        st.markdown("**1-Hop Neighbors:** 5 Intermediate Accounts (ACC_INT_0 to 4)")
-        if hops == 2:
-            st.markdown("**2-Hop Neighbors:** ACC_MERGE_DST (Final Merger node)")
-            st.markdown("**Aggregator Formula:**")
-            st.latex(r"h_{v}^{(1)} = \text{ReLU}\left(W \cdot \text{Mean}(\{h_{u}^{(0)}\})\right)")
-            st.warning("⚠️ GNN captures a high-degree split topology flowing into a single collector. Structuring alert flagged.")
-    else:
-        st.markdown("**Target Node:** ACC_005 (Factual: 🟢 Safe)")
-        st.markdown("**1-Hop Neighbors:** ACC_042, ACC_011")
-        if hops == 2:
-            st.markdown("**2-Hop Neighbors:** ACC_095")
-            st.success("✅ Standard localized connections. Low-risk structural embedding generated.")
-
-with col_tb:
-    st.write("### Local Sampling Topology")
-    sub = nx.DiGraph()
-    if "CYCLE" in target_node:
-        sub.add_node("ACC_CYCLE_A", color="red")
-        sub.add_edge("ACC_CYCLE_D", "ACC_CYCLE_A", amount=12000)
-        sub.add_edge("ACC_CYCLE_A", "ACC_CYCLE_B", amount=12000)
-        if hops == 2:
-            sub.add_edge("ACC_CYCLE_B", "ACC_CYCLE_C", amount=12000)
-            sub.add_edge("ACC_CYCLE_C", "ACC_CYCLE_D", amount=12000)
-    elif "SPLIT" in target_node:
-        sub.add_node("ACC_SPLIT_SRC", color="red")
-        for i in range(4):
-            sub.add_edge("ACC_SPLIT_SRC", f"ACC_INT_{i}", amount=9500)
-            if hops == 2:
-                sub.add_edge(f"ACC_INT_{i}", "ACC_MERGE_DST", amount=9450)
-    else:
-        sub.add_node("ACC_005", color="blue")
-        sub.add_edge("ACC_042", "ACC_005", amount=350)
-        sub.add_edge("ACC_005", "ACC_011", amount=150)
-        if hops == 2:
-            sub.add_edge("ACC_011", "ACC_095", amount=140)
-            
-    pos = nx.spring_layout(sub, seed=42)
-    node_x, node_y, node_colors = [], [], []
-    for node in sub.nodes:
-        x, y = pos[node]
-        node_x.append(x)
-        node_y.append(y)
-        node_colors.append("red" if "Target" in node or node in [target_node.split(" ")[0]] else "#475569")
-        
-    edge_x, edge_y = [], []
-    for u, v in sub.edges:
-        x0, y0 = pos[u]
-        x1, y1 = pos[v]
-        edge_x.extend([x0, x1, None])
-        edge_y.extend([y0, y1, None])
-        
-    fig = go.Figure(
-        data=[
-            go.Scatter(x=edge_x, y=edge_y, mode="lines", line=dict(color="#334155", width=1.5), hoverinfo="none"),
-            go.Scatter(x=node_x, y=node_y, mode="markers+text", text=list(sub.nodes), textposition="top center", marker=dict(size=14, color=node_colors))
-        ],
-        layout=go.Layout(
-            showlegend=False,
-            paper_bgcolor="#0b0f19",
-            plot_bgcolor="#0b0f19",
-            margin=dict(l=10, r=10, t=10, b=10),
-            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-        )
+with tab_exp:
+    st.subheader("🧠 GraphSAGE Neighborhood Sampling Explainer")
+    st.write(
+        "How does a GNN capture connections? Traditional models only check row-level metrics. "
+        "GraphSAGE aggregates features from the target node's local neighborhood (1-hop and 2-hop paths) "
+        "to build a dense vector embedding that reflects its structural position."
     )
-    st.plotly_chart(fig, use_container_width=True)
 
-st.divider()
+    target_node = st.selectbox("Pick Target Node to visualize GNN aggregation", ["ACC_CYCLE_A (Cycle Hub)", "ACC_SPLIT_SRC (Splitter Node)", "ACC_005 (Regular Node)"], index=0)
+    hops = st.slider("Neighborhood depth (Hops)", 1, 2, 2)
 
-# 3. Interactive Threat Monitoring Command Center
-st.subheader("⚡ Threat Command Center & Active Alerts")
+    col_ta, col_tb = st.columns([1, 1.5])
+    with col_ta:
+        st.write("### Aggregator Summary")
+        if "CYCLE" in target_node:
+            st.markdown("**Target Node:** ACC_CYCLE_A (Factual: 🔴 Fraud Loop)")
+            st.markdown("**1-Hop Neighbors:** ACC_CYCLE_B (Outflow), ACC_CYCLE_D (Inflow)")
+            if hops == 2:
+                st.markdown("**2-Hop Neighbors:** ACC_CYCLE_C (Loop connector)")
+                st.markdown("**Aggregator Formula:**")
+                st.latex(r"h_{v}^{(1)} = \text{ReLU}\left(W \cdot \text{Mean}(\{h_{u}^{(0)}, \forall u \in \mathcal{N}(v)\})\right)")
+                st.warning("⚠️ GNN detects identical, circular transaction flows with neighbor nodes. Fused risk is highly elevated.")
+        elif "SPLIT" in target_node:
+            st.markdown("**Target Node:** ACC_SPLIT_SRC (Factual: 🔴 Splitter)")
+            st.markdown("**1-Hop Neighbors:** 5 Intermediate Accounts (ACC_INT_0 to 4)")
+            if hops == 2:
+                st.markdown("**2-Hop Neighbors:** ACC_MERGE_DST (Final Merger node)")
+                st.markdown("**Aggregator Formula:**")
+                st.latex(r"h_{v}^{(1)} = \text{ReLU}\left(W \cdot \text{Mean}(\{h_{u}^{(0)}\})\right)")
+                st.warning("⚠️ GNN captures a high-degree split topology flowing into a single collector. Structuring alert flagged.")
+        else:
+            st.markdown("**Target Node:** ACC_005 (Factual: 🟢 Safe)")
+            st.markdown("**1-Hop Neighbors:** ACC_042, ACC_011")
+            if hops == 2:
+                st.markdown("**2-Hop Neighbors:** ACC_095")
+                st.success("✅ Standard localized connections. Low-risk structural embedding generated.")
 
-# ── METRIC TILES ──────────────────────────────────────────────────────────
-metrics_cols = st.columns(5)
-with metrics_cols[0]:
-    st.markdown('<div class="metric-card"><div>Inspected Trx</div><h2 class="neon-green">14,960</h2></div>', unsafe_allow_html=True)
-with metrics_cols[1]:
-    st.markdown('<div class="metric-card"><div>Active Alerts</div><h2 class="neon-red">24</h2></div>', unsafe_allow_html=True)
-with metrics_cols[2]:
-    st.markdown('<div class="metric-card"><div>Fraud Rate</div><h2 class="neon-yellow">0.16%</h2></div>', unsafe_allow_html=True)
-with metrics_cols[3]:
-    st.markdown('<div class="metric-card"><div>Avg Latency</div><h2>18.5ms</h2></div>', unsafe_allow_html=True)
-with metrics_cols[4]:
-    st.markdown('<div class="metric-card"><div>P99 Latency</div><h2 class="neon-green">41.0ms</h2></div>', unsafe_allow_html=True)
-
-# Grid layout split view
-main_col1, main_col2 = st.columns([3, 2])
-
-# State for selected alert details
-if "selected_alert" not in st.session_state:
-    st.session_state.selected_alert = st.session_state.sandbox_alerts[0]
-
-with main_col2:
-    st.write("### 🚨 Live Threat Feed")
-    
-    # Load alerts
-    alerts = []
-    if api_active:
-        try:
-            resp = requests.get(f"{API_BASE}/alerts?limit={alert_limit}", timeout=3)
-            alerts = resp.json().get("alerts", []) if resp.ok else []
-        except Exception:
-            alerts = []
-    else:
-        alerts = st.session_state.sandbox_alerts
-        
-    filtered_alerts = [a for a in alerts if a.get("fused_score", 0) >= fraud_threshold_display]
-    
-    alert_data = []
-    for idx, a in enumerate(filtered_alerts):
-        score = a.get("fused_score", 0)
-        alert_data.append({
-            "Index": idx,
-            "Transaction ID": a.get("transaction_id", "")[:12],
-            "Sender": a.get("sender", "")[:12],
-            "Receiver": a.get("receiver", "")[:12],
-            "Amount": f"${a.get('amount', 0):,.2f}",
-            "Fused Risk": f"{score:.4f}",
-            "Status": "🔴 FRAUD" if score >= 0.7 else "🟡 SUSPICIOUS"
-        })
-        
-    if alert_data:
-        df_table = pd.DataFrame(alert_data)
-        selected = st.dataframe(
-            df_table.drop(columns="Index"),
-            use_container_width=True,
-            hide_index=True,
-            selection_mode="single-row",
-            on_select="rerun"
-        )
-        
-        if selected and selected.selection.rows:
-            selected_idx = selected.selection.rows[0]
-            st.session_state.selected_alert = filtered_alerts[selected_idx]
-    else:
-        st.info("No active threats detected above the selected risk threshold.")
-        
-    st.divider()
-    st.write("### 🔬 Manual Transaction Simulator Sandbox")
-    st.caption("Input transactions to test classification outputs of XGBoost vs GraphSAGE.")
-    
-    col_sa, col_sb = st.columns(2)
-    with col_sa:
-        manual_sender = st.text_input("Sender Acc", value="ACC_CYCLE_A")
-        manual_amount = st.number_input("Amount", min_value=1.0, value=12000.0)
-        manual_currency = st.selectbox("Currency", ["USD", "EUR", "BTC"])
-    with col_sb:
-        manual_receiver = st.text_input("Receiver Acc", value="ACC_CYCLE_B")
-        manual_type = st.selectbox("Format", ["Wire Transfer", "ACH", "Cash"])
-        
-    if st.button("🎯 Score Transaction", type="primary", use_container_width=True):
-        G_temp = st.session_state.sandbox_graph
-        in_cycle = False
-        if manual_sender in G_temp and manual_receiver in G_temp:
-            G_temp.add_edge(manual_sender, manual_receiver)
-            try:
-                cycles = list(nx.find_cycle(G_temp, source=manual_sender, orientation="original"))
-                in_cycle = len(cycles) > 0
-            except nx.NetworkXNoCycle:
-                in_cycle = False
-            G_temp.remove_edge(manual_sender, manual_receiver)
-            
-        tab_score = 0.85 if manual_amount > 100000 else random.uniform(0.1, 0.4)
-        gnn_score = 0.96 if in_cycle or "CYCLE" in manual_sender or "SPLIT" in manual_sender else random.uniform(0.01, 0.3)
-        fused_score = 0.6 * tab_score + 0.4 * gnn_score
-        
-        new_alert = {
-            "transaction_id": f"TX_MANUAL_{random.randint(100, 999)}",
-            "sender": manual_sender,
-            "receiver": manual_receiver,
-            "amount": manual_amount,
-            "tabular_score": tab_score,
-            "gnn_score": gnn_score,
-            "fused_score": fused_score,
-            "confidence": 0.85 if fused_score > 0.5 else 0.95,
-            "type": "🚨 Laundering Loop (Cycle)" if in_cycle else "Regular Transaction Scored",
-            "timestamp": datetime.now().strftime("%H:%M:%S"),
-            "risk_factors": [
-                {"feature": "Graph Loop Topology" if in_cycle else "Transaction Volume", "shap_value": 0.42 if in_cycle else 0.12},
-                {"feature": "Currency Crossings", "shap_value": 0.08 if manual_currency != "USD" else -0.05},
-                {"feature": "Single Transaction Amount", "shap_value": 0.15 if manual_amount > 10000 else -0.1}
-            ]
-        }
-        st.session_state.sandbox_alerts.insert(0, new_alert)
-        st.session_state.selected_alert = new_alert
-        st.success("Transaction scored and alert feed updated!")
-        st.rerun()
-
-with main_col1:
-    st.write("### 🌐 Local Transaction Subgraph Topology")
-    
-    alert = st.session_state.selected_alert
-    if alert:
-        sender = alert.get("sender", "")
-        receiver = alert.get("receiver", "")
-        
-        G_temp = st.session_state.sandbox_graph
-        nodes_to_draw = {sender, receiver}
-        for n in [sender, receiver]:
-            if n in G_temp:
-                nodes_to_draw.update(G_temp.neighbors(n))
-                nodes_to_draw.update(G_temp.predecessors(n))
-        
-        sub = G_temp.subgraph(nodes_to_draw)
-        pos = nx.spring_layout(sub, seed=42)
-        
-        # Edges
-        edge_x, edge_y = [], []
-        fraud_edge_x, fraud_edge_y = [], []
-        for u, v, d in sub.edges(data=True):
-            x0, y0 = pos[u]
-            x1, y1 = pos[v]
-            is_alert_edge = (u == sender and v == receiver) or d.get("is_fraud", 0)
-            
-            if is_alert_edge:
-                fraud_edge_x.extend([x0, x1, None])
-                fraud_edge_y.extend([y0, y1, None])
-            else:
-                edge_x.extend([x0, x1, None])
-                edge_y.extend([y0, y1, None])
+    with col_tb:
+        st.write("### Local Sampling Topology")
+        sub = nx.DiGraph()
+        if "CYCLE" in target_node:
+            sub.add_node("ACC_CYCLE_A", color="red")
+            sub.add_edge("ACC_CYCLE_D", "ACC_CYCLE_A", amount=12000)
+            sub.add_edge("ACC_CYCLE_A", "ACC_CYCLE_B", amount=12000)
+            if hops == 2:
+                sub.add_edge("ACC_CYCLE_B", "ACC_CYCLE_C", amount=12000)
+                sub.add_edge("ACC_CYCLE_C", "ACC_CYCLE_D", amount=12000)
+        elif "SPLIT" in target_node:
+            sub.add_node("ACC_SPLIT_SRC", color="red")
+            for i in range(4):
+                sub.add_edge("ACC_SPLIT_SRC", f"ACC_INT_{i}", amount=9500)
+                if hops == 2:
+                    sub.add_edge(f"ACC_INT_{i}", "ACC_MERGE_DST", amount=9450)
+        else:
+            sub.add_node("ACC_005", color="blue")
+            sub.add_edge("ACC_042", "ACC_005", amount=350)
+            sub.add_edge("ACC_005", "ACC_011", amount=150)
+            if hops == 2:
+                sub.add_edge("ACC_011", "ACC_095", amount=140)
                 
-        # Nodes
-        node_x, node_y, node_colors, node_sizes, node_texts = [], [], [], [], []
+        pos = nx.spring_layout(sub, seed=42)
+        node_x, node_y, node_colors = [], [], []
         for node in sub.nodes:
             x, y = pos[node]
             node_x.append(x)
             node_y.append(y)
+            node_colors.append("red" if "Target" in node or node in [target_node.split(" ")[0]] else "#475569")
             
-            if node == sender or node == receiver:
-                node_colors.append("#ef4444")
-                node_sizes.append(22)
-            elif "CYCLE" in node or "SPLIT" in node or "MERGE" in node:
-                node_colors.append("#f59e0b")
-                node_sizes.append(16)
-            else:
-                node_colors.append("#475569")
-            node_texts.append(f"Node: {node}<br>In-degree: {G_temp.in_degree(node)}<br>Out-degree: {G_temp.out_degree(node)}")
+        edge_x, edge_y = [], []
+        for u, v in sub.edges:
+            x0, y0 = pos[u]
+            x1, y1 = pos[v]
+            edge_x.extend([x0, x1, None])
+            edge_y.extend([y0, y1, None])
             
         fig = go.Figure(
             data=[
-                go.Scatter(x=edge_x, y=edge_y, mode="lines", line=dict(color="#334155", width=1), hoverinfo="none", name="Normal Transfers"),
-                go.Scatter(x=fraud_edge_x, y=fraud_edge_y, mode="lines", line=dict(color="#ef4444", width=3), hoverinfo="none", name="Flagged Outflows"),
-                go.Scatter(x=node_x, y=node_y, mode="markers", text=node_texts, hoverinfo="text", marker=dict(size=node_sizes, color=node_colors, line=dict(width=1.5, color="#0f172a")), name="Accounts")
+                go.Scatter(x=edge_x, y=edge_y, mode="lines", line=dict(color="#5B6478", width=1.5), hoverinfo="none"),
+                go.Scatter(x=node_x, y=node_y, mode="markers+text", text=list(sub.nodes), textposition="top center", marker=dict(size=14, color=node_colors))
             ],
             layout=go.Layout(
-                paper_bgcolor="#0b0f19",
-                plot_bgcolor="#0b0f19",
-                showlegend=True,
+                showlegend=False,
+                paper_bgcolor="#14161C",
+                plot_bgcolor="#14161C",
+                margin=dict(l=10, r=10, t=10, b=10),
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                margin=dict(l=10, r=10, t=10, b=10),
-                legend=dict(bgcolor="rgba(15, 23, 42, 0.8)", bordercolor="#334155")
             )
         )
         st.plotly_chart(fig, use_container_width=True)
+
+with tab_cmd:
+    # 3. Interactive Threat Monitoring Command Center
+    st.subheader("⚡ Threat Command Center & Active Alerts")
+    
+    # ── METRIC TILES ──────────────────────────────────────────────────────────
+    metrics_cols = st.columns(5)
+    with metrics_cols[0]:
+        st.markdown('<div class="metric-card"><div>Inspected Trx</div><h2 class="neon-green">14,960</h2></div>', unsafe_allow_html=True)
+    with metrics_cols[1]:
+        st.markdown('<div class="metric-card"><div>Active Alerts</div><h2 class="neon-red">24</h2></div>', unsafe_allow_html=True)
+    with metrics_cols[2]:
+        st.markdown('<div class="metric-card"><div>Fraud Rate</div><h2 class="neon-yellow">0.16%</h2></div>', unsafe_allow_html=True)
+    with metrics_cols[3]:
+        st.markdown('<div class="metric-card"><div>Avg Latency</div><h2>18.5ms</h2></div>', unsafe_allow_html=True)
+    with metrics_cols[4]:
+        st.markdown('<div class="metric-card"><div>P99 Latency</div><h2 class="neon-green">41.0ms</h2></div>', unsafe_allow_html=True)
+
+    # Grid layout split view
+    main_col1, main_col2 = st.columns([1.5, 1])
+
+    # State for selected alert details
+    if "selected_alert" not in st.session_state:
+        st.session_state.selected_alert = st.session_state.sandbox_alerts[0]
+
+    with main_col2:
+        st.write("### 🚨 Live Threat Feed")
         
-        # Details & SHAP Side-by-Side
+        # Load alerts
+        alerts = []
+        if api_active:
+            try:
+                resp = requests.get(f"{API_BASE}/alerts?limit={alert_limit}", timeout=3)
+                alerts = resp.json().get("alerts", []) if resp.ok else []
+            except Exception:
+                alerts = []
+        else:
+            alerts = st.session_state.sandbox_alerts
+            
+        filtered_alerts = [a for a in alerts if a.get("fused_score", 0) >= fraud_threshold_display]
+        
+        alert_data = []
+        for idx, a in enumerate(filtered_alerts):
+            score = a.get("fused_score", 0)
+            alert_data.append({
+                "Index": idx,
+                "Transaction ID": a.get("transaction_id", "")[:12],
+                "Sender": a.get("sender", "")[:12],
+                "Receiver": a.get("receiver", "")[:12],
+                "Amount": f"${a.get('amount', 0):,.2f}",
+                "Fused Risk": f"{score:.4f}",
+                "Status": "🔴 FRAUD" if score >= 0.7 else "🟡 SUSPICIOUS"
+            })
+            
+        if alert_data:
+            df_table = pd.DataFrame(alert_data)
+            selected = st.dataframe(
+                df_table.drop(columns="Index"),
+                use_container_width=True,
+                hide_index=True,
+                selection_mode="single-row",
+                on_select="rerun"
+            )
+            
+            if selected and selected.selection.rows:
+                selected_idx = selected.selection.rows[0]
+                st.session_state.selected_alert = filtered_alerts[selected_idx]
+        else:
+            st.info("No active threats detected above the selected risk threshold.")
+            
         st.divider()
-        st.write(f"🔍 Alert Details — {alert.get('transaction_id', '')}")
+        st.write("### 🔬 Manual Transaction Simulator Sandbox")
+        st.caption("Input transactions to test classification outputs of XGBoost vs GraphSAGE.")
         
-        col_da, col_db = st.columns(2)
-        with col_da:
-            st.markdown(f"**Threat Type:** {alert.get('type', 'Flagged Activity')}")
-            st.write(f"💵 **Amount:** ${alert.get('amount', 0):,.2f}")
-            st.write(f"🕒 **Timestamp:** {alert.get('timestamp', '')}")
+        col_sa, col_sb = st.columns(2)
+        with col_sa:
+            manual_sender = st.text_input("Sender Acc", value="ACC_CYCLE_A")
+            manual_amount = st.number_input("Amount", min_value=1.0, value=12000.0)
+            manual_currency = st.selectbox("Currency", ["USD", "EUR", "BTC"])
+        with col_sb:
+            manual_receiver = st.text_input("Receiver Acc", value="ACC_CYCLE_B")
+            manual_type = st.selectbox("Format", ["Wire Transfer", "ACH", "Cash"])
             
-            # Scores
-            score_df = pd.DataFrame([
-                {"Model": "XGBoost (Tabular Baseline)", "Risk Score": f"{alert.get('tabular_score', 0):.4f}"},
-                {"Model": "GraphSAGE (GNN Network)", "Risk Score": f"{alert.get('gnn_score', 0):.4f}"},
-                {"Model": "SentinelGraph (Fused Result)", "Risk Score": f"{alert.get('fused_score', 0):.4f}"}
-            ])
-            st.dataframe(score_df, hide_index=True, use_container_width=True)
+        if st.button("🎯 Score Transaction", type="primary", use_container_width=True):
+            G_temp = st.session_state.sandbox_graph
+            in_cycle = False
+            if manual_sender in G_temp and manual_receiver in G_temp:
+                G_temp.add_edge(manual_sender, manual_receiver)
+                try:
+                    cycles = list(nx.find_cycle(G_temp, source=manual_sender, orientation="original"))
+                    in_cycle = len(cycles) > 0
+                except nx.NetworkXNoCycle:
+                    in_cycle = False
+                G_temp.remove_edge(manual_sender, manual_receiver)
+                
+            tab_score = 0.85 if manual_amount > 100000 else random.uniform(0.1, 0.4)
+            gnn_score = 0.96 if in_cycle or "CYCLE" in manual_sender or "SPLIT" in manual_sender else random.uniform(0.01, 0.3)
+            fused_score = 0.6 * tab_score + 0.4 * gnn_score
             
-        with col_db:
-            st.markdown("**📊 Risk Factor Contributions (SHAP)**")
-            shap_factors = alert.get("risk_factors", [])
-            if shap_factors:
-                df_shap = pd.DataFrame(shap_factors)
-                fig_shap = go.Figure(
-                    data=[
-                        go.Bar(
-                            x=df_shap["shap_value"],
-                            y=df_shap["feature"],
-                            orientation="h",
-                            marker_color=["#ef4444" if x > 0 else "#3b82f6" for x in df_shap["shap_value"]]
-                        )
-                    ],
-                    layout=go.Layout(
-                        paper_bgcolor="#0b0f19",
-                        plot_bgcolor="#0b0f19",
-                        xaxis=dict(gridcolor="#1e293b", color="#94a3b8"),
-                        yaxis=dict(color="#94a3b8"),
-                        margin=dict(l=10, r=10, t=10, b=10),
-                        height=200
-                    )
+            new_alert = {
+                "transaction_id": f"TX_MANUAL_{random.randint(100, 999)}",
+                "sender": manual_sender,
+                "receiver": manual_receiver,
+                "amount": manual_amount,
+                "tabular_score": tab_score,
+                "gnn_score": gnn_score,
+                "fused_score": fused_score,
+                "confidence": 0.85 if fused_score > 0.5 else 0.95,
+                "type": "🚨 Laundering Loop (Cycle)" if in_cycle else "Regular Transaction Scored",
+                "timestamp": datetime.now().strftime("%H:%M:%S"),
+                "risk_factors": [
+                    {"feature": "Graph Loop Topology" if in_cycle else "Transaction Volume", "shap_value": 0.42 if in_cycle else 0.12},
+                    {"feature": "Currency Crossings", "shap_value": 0.08 if manual_currency != "USD" else -0.05},
+                    {"feature": "Single Transaction Amount", "shap_value": 0.15 if manual_amount > 10000 else -0.1}
+                ]
+            }
+            st.session_state.sandbox_alerts.insert(0, new_alert)
+            st.session_state.selected_alert = new_alert
+            st.success("Transaction scored and alert feed updated!")
+            st.rerun()
+
+    with main_col1:
+        st.write("### 🌐 Local Transaction Subgraph Topology")
+        
+        alert = st.session_state.selected_alert
+        if alert:
+            sender = alert.get("sender", "")
+            receiver = alert.get("receiver", "")
+            
+            G_temp = st.session_state.sandbox_graph
+            nodes_to_draw = {sender, receiver}
+            for n in [sender, receiver]:
+                if n in G_temp:
+                    nodes_to_draw.update(G_temp.neighbors(n))
+                    nodes_to_draw.update(G_temp.predecessors(n))
+            
+            sub = G_temp.subgraph(nodes_to_draw)
+            pos = nx.spring_layout(sub, seed=42)
+            
+            # Edges
+            edge_x, edge_y = [], []
+            fraud_edge_x, fraud_edge_y = [], []
+            for u, v, d in sub.edges(data=True):
+                x0, y0 = pos[u]
+                x1, y1 = pos[v]
+                is_alert_edge = (u == sender and v == receiver) or d.get("is_fraud", 0)
+                
+                if is_alert_edge:
+                    fraud_edge_x.extend([x0, x1, None])
+                    fraud_edge_y.extend([y0, y1, None])
+                else:
+                    edge_x.extend([x0, x1, None])
+                    edge_y.extend([y0, y1, None])
+                    
+            # Nodes
+            node_x, node_y, node_colors, node_sizes, node_texts = [], [], [], [], []
+            for node in sub.nodes:
+                x, y = pos[node]
+                node_x.append(x)
+                node_y.append(y)
+                
+                if node == sender or node == receiver:
+                    node_colors.append("#ef4444")
+                    node_sizes.append(22)
+                elif "CYCLE" in node or "SPLIT" in node or "MERGE" in node:
+                    node_colors.append("#f59e0b")
+                    node_sizes.append(16)
+                else:
+                    node_colors.append("#475569")
+                node_texts.append(f"Node: {node}<br>In-degree: {G_temp.in_degree(node)}<br>Out-degree: {G_temp.out_degree(node)}")
+                
+            fig = go.Figure(
+                data=[
+                    go.Scatter(x=edge_x, y=edge_y, mode="lines", line=dict(color="#5B6478", width=1), hoverinfo="none", name="Normal Transfers"),
+                    go.Scatter(x=fraud_edge_x, y=fraud_edge_y, mode="lines", line=dict(color="#E5484D", width=3), hoverinfo="none", name="Flagged Outflows"),
+                    go.Scatter(x=node_x, y=node_y, mode="markers", text=node_texts, hoverinfo="text", marker=dict(size=node_sizes, color=node_colors, line=dict(width=1.5, color="#1D2029")), name="Accounts")
+                ],
+                layout=go.Layout(
+                    paper_bgcolor="#14161C",
+                    plot_bgcolor="#14161C",
+                    showlegend=True,
+                    xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                    yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    legend=dict(bgcolor="rgba(29, 32, 41, 0.8)", bordercolor="#5B6478")
                 )
-                st.plotly_chart(fig_shap, use_container_width=True)
-    else:
-        st.info("Select a flagged alert to explore the localized network structure.")
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Details & SHAP Side-by-Side
+            st.divider()
+            st.write(f"🔍 Alert Details — {alert.get('transaction_id', '')}")
+            
+            col_da, col_db = st.columns(2)
+            with col_da:
+                st.markdown(f"**Threat Type:** {alert.get('type', 'Flagged Activity')}")
+                st.write(f"💵 **Amount:** ${alert.get('amount', 0):,.2f}")
+                st.write(f"🕒 **Timestamp:** {alert.get('timestamp', '')}")
+                
+                # Scores
+                score_df = pd.DataFrame([
+                    {"Model": "XGBoost (Tabular Baseline)", "Risk Score": f"{alert.get('tabular_score', 0):.4f}"},
+                    {"Model": "GraphSAGE (GNN Network)", "Risk Score": f"{alert.get('gnn_score', 0):.4f}"},
+                    {"Model": "SentinelGraph (Fused Result)", "Risk Score": f"{alert.get('fused_score', 0):.4f}"}
+                ])
+                st.dataframe(score_df, hide_index=True, use_container_width=True)
+                
+            with col_db:
+                st.markdown("**📊 Risk Factor Contributions (SHAP)**")
+                shap_factors = alert.get("risk_factors", [])
+                if shap_factors:
+                    df_shap = pd.DataFrame(shap_factors)
+                    fig_shap = go.Figure(
+                        data=[
+                            go.Bar(
+                                x=df_shap["shap_value"],
+                                y=df_shap["feature"],
+                                orientation="h",
+                                marker_color=["#E5484D" if x > 0 else "#3E7C8C" for x in df_shap["shap_value"]]
+                            )
+                        ],
+                        layout=go.Layout(
+                            paper_bgcolor="#14161C",
+                            plot_bgcolor="#14161C",
+                            xaxis=dict(gridcolor="#1D2029", color="#E7E9EE"),
+                            yaxis=dict(color="#E7E9EE"),
+                            margin=dict(l=10, r=10, t=10, b=10),
+                            height=200
+                        )
+                    )
+                    st.plotly_chart(fig_shap, use_container_width=True)
+        else:
+            st.info("Select a flagged alert to explore the localized network structure.")
 
 # ── Collapsible Model Validation Registry ─────────────────────────────────────
 st.divider()
