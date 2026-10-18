@@ -63,6 +63,10 @@ $$m_v^{(k)} = \text{MEAN}_{u \in N(v)} \, h_u^{(k-1)}$$
 
 $$h_v^{(k)} = \text{ReLU}\!\left(W_{\text{self}} \, h_v^{(k-1)} + W_{\text{neigh}} \, m_v^{(k)} + b\right)$$
 
+**Training Loss** — Weighted Cross-Entropy (class-imbalance aware):
+
+$$L = -\sum_i w_{y_i} \log P(y_i \mid x_i), \quad w_+ = \frac{N_{\text{neg}}}{N_{\text{pos}}}$$
+
 ---
 
 ### 2. XGBoost (Gradient Boosted Trees)
@@ -73,11 +77,11 @@ $$F(x) = F_0(x) + \eta \sum_{m=1}^{M} f_m(x)$$
 
 where $\eta$ is the learning rate and each $f_m$ is a CART tree.
 
-**Weighted Cross-Entropy Loss** (handles class imbalance, `w` = per-class weight):
+**Objective** — Binary Logistic Loss, optimized via second-order gradient boosting:
 
-$$L = -\sum_i w_{y_i} \log P(y_i \mid x_i)$$
+$$l(y_i, \hat{p}_i) = -\left[ y_i \log \hat{p}_i + (1 - y_i) \log(1 - \hat{p}_i) \right], \quad \hat{p}_i = \sigma(\hat{y}_i)$$
 
-Class imbalance is controlled via `scale_pos_weight` $= N_{\text{neg}} / N_{\text{pos}}$.
+Class imbalance is handled via `scale_pos_weight` $= N_{\text{neg}} / N_{\text{pos}}$, which upscales gradients for the minority (fraud) class.
 
 ---
 
