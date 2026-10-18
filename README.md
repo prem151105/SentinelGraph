@@ -55,21 +55,13 @@ Unlike GCNs, GraphSAGE relies on **neighborhood sampling** to generate represent
 
 ### 1. GraphSAGE (Graph Sample and Aggregate)
 
-**Step 1 — Neighborhood Mean Aggregation** (layer `k`):
+**Neighborhood Mean Aggregation** (layer `k`):
 
 $$m_v^{(k)} = \text{MEAN}_{u \in N(v)} \, h_u^{(k-1)}$$
 
-**Step 2 — Node Embedding Update:**
+**Node Embedding Update:**
 
 $$h_v^{(k)} = \text{ReLU}\!\left(W_{\text{self}} \, h_v^{(k-1)} + W_{\text{neigh}} \, m_v^{(k)} + b\right)$$
-
-**Step 3 — Edge / Transaction Score** (concatenate src + dst embeddings):
-
-$$z_{uv} = \left[ h_u^{(K)} \;\|\; h_v^{(K)} \right] \xrightarrow{\text{MLP}} P_{\text{GNN}}(\text{fraud})$$
-
-**Training Loss** (class-weighted cross-entropy for imbalance):
-
-$$\mathcal{L}_{\text{GNN}} = -\frac{1}{|\mathcal{E}|}\sum_{(u,v)} \left[ w_+ \cdot y_{uv} \log \hat{y}_{uv} + (1 - y_{uv}) \log (1 - \hat{y}_{uv}) \right], \quad w_+ = \frac{N_{\text{neg}}}{N_{\text{pos}}}$$
 
 ---
 
@@ -81,19 +73,11 @@ $$F(x) = F_0(x) + \eta \sum_{m=1}^{M} f_m(x)$$
 
 where $\eta$ is the learning rate and each $f_m$ is a CART tree.
 
-**Regularized Objective** at round `t`:
+**Weighted Cross-Entropy Loss** (handles class imbalance, `w` = per-class weight):
 
-$$\mathcal{L}^{(t)} = \sum_{i=1}^{n} l\!\left(y_i,\, \hat{y}_i^{(t-1)} + f_t(x_i)\right) + \gamma T + \tfrac{1}{2}\lambda \sum_{j=1}^{T} w_j^2$$
+$$L = -\sum_i w_{y_i} \log P(y_i \mid x_i)$$
 
-**Optimal Leaf Weight** (closed-form, derived via second-order Taylor expansion):
-
-$$w_j^* = -\frac{\sum_{i \in I_j} g_i}{\sum_{i \in I_j} h_i + \lambda}$$
-
-**Split Gain** used for tree construction:
-
-$$\text{Gain} = \frac{1}{2}\!\left[\frac{G_L^2}{H_L + \lambda} + \frac{G_R^2}{H_R + \lambda} - \frac{(G_L+G_R)^2}{H_L+H_R+\lambda}\right] - \gamma$$
-
-**Class Imbalance** handled via `scale_pos_weight` $= N_{\text{neg}} / N_{\text{pos}}$, which scales the gradient of positive samples so rare fraud is not under-penalised.
+Class imbalance is controlled via `scale_pos_weight` $= N_{\text{neg}} / N_{\text{pos}}$.
 
 ---
 
